@@ -12,12 +12,18 @@ This project sets up real-time object detection using YOLO (You Only Look Once) 
     ```
     pip install ultralytics opencv-python numpy tinydb
     ```
-2. Run the YOLO Webcam Script
+2. Run the YOLO Script
 
-    This script detects objects using your webcam and stores results in detections.json.
+    This script detects objects using your webcam or an image and stores results in detections.json.
 
+    To use the webcam:
     ```
-    python yolo.py
+    python yolo.py --mode cam
+    ```
+
+    To use an image:
+    ```
+    python yolo.py --mode img --image image.jpg
     ```
 3. Start the Web Dashboard
 

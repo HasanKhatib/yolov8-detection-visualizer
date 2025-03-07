@@ -1,49 +1,71 @@
 import cv2
 import time
+import argparse
 from ultralytics import YOLO
-from tinydb import TinyDB, Query
+from tinydb import TinyDB
 
 # Initialize TinyDB (JSON-based NoSQL)
 db = TinyDB("detections.json")
 
-# Load YOLO model
 model = YOLO("yolov8n.pt")
 
-# Open webcam
-cap = cv2.VideoCapture(0)
+# selct mode and image
+parser = argparse.ArgumentParser(description="Run YOLO on camera or image.")
+parser.add_argument("--mode", choices=["cam", "img"], required=True, help="Select input source: 'cam' for webcam, 'img' for an image file.")
+parser.add_argument("--image", type=str, help="Path to image file (required for 'img' mode).")
+args = parser.parse_args()
 
-if not cap.isOpened():
-    print("Error: Could not open webcam.")
-    exit()
-
-while True:
-    success, frame = cap.read()
-    if not success:
-        print("Error: Could not read frame.")
-        break
-
-    # Run YOLO detection
+def process_frame(frame):
+    """Runs YOLO on a frame/image and saves results."""
     results = model(frame)
 
-    # Extract detected objects
     detections = []
     for obj in results[0].boxes.data.tolist():  
         x1, y1, x2, y2, conf, class_id = obj
         class_name = model.names[int(class_id)]
         detections.append(class_name)
 
-    # Store detections in TinyDB
+    # persist to db
     if detections:
         db.insert({"timestamp": time.time(), "objects": detections})
 
-    # Display detections on frame
-    annotated_frame = results[0].plot()
-    cv2.imshow("YOLO Webcam", annotated_frame)
+    return results[0].plot()  # Returns annotated image/frame
 
-    # Exit on 'q' key
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
+if args.mode == "cam":
+    # Open webcam
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Error: Could not open webcam.")
+        exit()
 
-# Cleanup
-cap.release()
-cv2.destroyAllWindows()
+    while True:
+        success, frame = cap.read()
+        if not success:
+            print("Error: Could not read frame.")
+            break
+        # process and show frame
+        annotated_frame = process_frame(frame)
+        cv2.imshow("YOLO Webcam", annotated_frame)
+
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+elif args.mode == "img":
+    if not args.image:
+        print("Error: You must provide an image path with --image when using 'img' mode.")
+        exit()
+
+    frame = cv2.imread(args.image)
+    if frame is None:
+        print(f"Error: Could not load image '{args.image}'.")
+        exit()
+
+    # process and show image
+    annotated_frame = process_frame(frame)
+    cv2.imshow("YOLO Image Detection", annotated_frame)
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
